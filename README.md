@@ -23,6 +23,10 @@ Before running the script, make sure you have the following installed:
       - Right-click on **This PC** > **Properties** > **Advanced system settings**.
       - Click **Environment Variables**, under **System variables**, select **Path**, and click **Edit**.
       - Add the path to the `bin` folder of FFmpeg (e.g., `C:\ffmpeg\bin`).
+     
+    #### Windows Winget Installation
+    - You can install FFmpeg using Winget (windows 10/11 package-manager)
+        - **terminal/cmd**: `winget install Gyan.FFmpeg`
       
     ### macOS/Linux Installation
     - You can install FFmpeg using `brew` (macOS) or your package manager (Linux):
