@@ -1,0 +1,16 @@
+{
+  "name": "syncedlyricsfinder",
+  "version": "1.0.0",
+  "description": "Find synced lyrics (with fallback) for provided flac files and add them to the flac files automatically.",
+  "scripts": {
+    "build": "node processLyrics.js",
+    "debug": "node processLyrics.js --debug"
+  },
+  "author": "SjoerdHekking",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "colors": "^1.4.0",
+    "yargs": "^17.7.2"
+  }
+}
