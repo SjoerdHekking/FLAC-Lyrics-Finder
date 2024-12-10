@@ -27,6 +27,10 @@ const rootDir = argv.dir;
 
 if (DEBUG) console.log(colors.yellow(`Using directory: ${rootDir}`));
 
+const headers = {
+    'User-Agent': 'FLAC-Lyrics-Finder (https://github.com/SjoerdHekking/FLAC-Lyrics-Finder)'
+};
+
 function getMetadata(filePath) {
     try {
         const ffprobeCommand = `ffprobe -v quiet -show_entries format_tags=artist,album,title -of csv=p=0 "${filePath}"`;
@@ -57,7 +61,7 @@ function uriEscape(str) {
 async function fetchLyrics(artist, title, album) {
     const apiUrl = `https://lrclib.net/api/get?artist_name=${uriEscape(artist)}&track_name=${uriEscape(title)}&album_name=${uriEscape(album)}`;
     try {
-        const response = await axios.get(apiUrl);
+        const response = await axios.get(apiUrl, { headers });
         return response.data;
     } catch (error) {
         if (DEBUG) console.error(colors.red(`Failed to fetch lyrics from /api/get: ${apiUrl}\n${error.message}`));
@@ -70,7 +74,7 @@ async function fetchFallbackLyrics(title, artist, album) {
     const apiUrlNoAlbum = `https://lrclib.net/api/search?track_name=${uriEscape(title)}&artist_name=${uriEscape(artist)}`;
 
     try {
-        const response = await axios.get(apiUrl);
+        const response = await axios.get(apiUrl, { headers });
         const results = response.data;
 
         if (Array.isArray(results) && results.length > 0) {
@@ -84,7 +88,7 @@ async function fetchFallbackLyrics(title, artist, album) {
     }
 
     try {
-        const responseNoAlbum = await axios.get(apiUrlNoAlbum);
+        const responseNoAlbum = await axios.get(apiUrlNoAlbum, { headers });
         const resultsNoAlbum = responseNoAlbum.data;
 
         if (Array.isArray(resultsNoAlbum) && resultsNoAlbum.length > 0) {
