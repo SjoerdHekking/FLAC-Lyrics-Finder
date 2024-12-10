@@ -5,7 +5,7 @@ This script extracts metadata from FLAC files, searches for lyrics using an exte
 ## Features
 
 - Extracts metadata (title, artist, album) from FLAC files.
-- Searches for synced lyrics using the [lrclib.net](https://ffmpeg.org/download.html) API.
+- Searches for synced lyrics using the [lrclib.net](https://lrclib.net) API.
 - Supports fallback lyrics search when the primary search fails.
 - Handles multiple artists for a single track.
 - Optionally runs in debug mode to provide more verbose logging.
