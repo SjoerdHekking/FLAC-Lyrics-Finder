@@ -33,20 +33,34 @@ const headers = {
 
 function getMetadata(filePath) {
     try {
-        const ffprobeCommand = `ffprobe -v quiet -show_entries format_tags=artist,album,title -of csv=p=0 "${filePath}"`;
-        const ffprobeOutput = execSync(ffprobeCommand, { encoding: 'utf8' }).trim();
+        const fields = {
+        title: '',
+        artist: '',
+        album: ''
+        };
 
-        const fields = ffprobeOutput.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(field => field.replace(/^"|"$/g, '').trim());
-        
-        if (fields.length === 3) {
-            return {
-                title: fields[0],
-                artist: fields[1],
-                album: fields[2],
-            };
+        const ffprobeCommand = `ffprobe -v quiet -show_entries format_tags=artist,album,title -of default=noprint_wrappers=1:nokey=0 "${filePath}"`;
+        const ffprobeOutput = execSync(ffprobeCommand, { encoding: 'utf8' });
+
+        ffprobeOutput.split('\n').forEach(line => {
+        if (line.startsWith('TAG:')) {
+            const [key, ...valueParts] = line.slice(4).split('=');
+            const keyName = key.trim().toLowerCase();
+            const value = valueParts.join('=').trim();
+            if (fields.hasOwnProperty(keyName)) {
+            fields[keyName] = value;
+            }
+        }
+        });
+
+        if (fields.title && fields.artist && fields.album) {
+        return fields;
         } else {
-            if (DEBUG) console.warn(colors.yellow(`Unexpected metadata format for file: ${filePath}`));
-            return null;
+        if (DEBUG) {
+            console.warn(colors.yellow(`Incomplete metadata for file: ${filePath}`));
+            console.warn('Extracted fields:', fields);
+        }
+        return null;
         }
     } catch (error) {
         if (DEBUG) console.error(colors.red(`Failed to extract metadata for file: ${filePath}\n${error.message}`));
