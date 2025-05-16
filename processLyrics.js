@@ -33,23 +33,23 @@ const headers = {
 
 function getMetadata(filePath) {
     try {
-	    const fields = {
-	    	title: '',
-	    	artist: '',
-	    	album: ''
-	    };
+        const fields = {
+            title: '',
+            artist: '',
+            album: ''
+        };
 
         const ffprobeCommand = `ffprobe -v quiet -show_entries format_tags=artist,album,title "${filePath}"`;
-	    const ffprobeOutput = execSync(ffprobeCommand, { encoding: 'utf8' });
+        const ffprobeOutput = execSync(ffprobeCommand, { encoding: 'utf8' });
 
-	    ffprobeOutput.split('\n').forEach(line => {
-		    const match = line.match(/^TAG:(TITLE|ARTIST|ALBUM)=(.*)$/);
-		    if (match) {
+        ffprobeOutput.split('\n').forEach(line => {
+            const match = line.match(/^TAG:(TITLE|ARTIST|ALBUM)=(.*)$/);
+            if (match) {
                 const propertyName = match[1].toLowerCase();
                 const propertyValue = match[2];
-		        fields[propertyName] = propertyValue;
-		    }
-	    });
+                fields[propertyName] = propertyValue;
+            }
+        });
 
         if (Object.keys(fields).length === 3) {
             return fields;
