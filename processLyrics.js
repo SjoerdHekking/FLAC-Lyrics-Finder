@@ -33,17 +33,26 @@ const headers = {
 
 function getMetadata(filePath) {
     try {
-        const ffprobeCommand = `ffprobe -v quiet -show_entries format_tags=artist,album,title -of csv=p=0 "${filePath}"`;
-        const ffprobeOutput = execSync(ffprobeCommand, { encoding: 'utf8' }).trim();
+	    const fields = {
+	    	title: '',
+	    	artist: '',
+	    	album: ''
+	    };
 
-        const fields = ffprobeOutput.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(field => field.replace(/^"|"$/g, '').trim());
-        
-        if (fields.length === 3) {
-            return {
-                title: fields[0],
-                artist: fields[1],
-                album: fields[2],
-            };
+        const ffprobeCommand = `ffprobe -v quiet -show_entries format_tags=artist,album,title "${filePath}"`;
+	    const ffprobeOutput = execSync(ffprobeCommand, { encoding: 'utf8' });
+
+	    ffprobeOutput.split('\n').forEach(line => {
+		    const match = line.match(/^TAG:(TITLE|ARTIST|ALBUM)=(.*)$/);
+		    if (match) {
+                const propertyName = match[1].toLowerCase();
+                const propertyValue = match[2];
+		        fields[propertyName] = propertyValue;
+		    }
+	    });
+
+        if (Object.keys(fields).length === 3) {
+            return fields;
         } else {
             if (DEBUG) console.warn(colors.yellow(`Unexpected metadata format for file: ${filePath}`));
             return null;
