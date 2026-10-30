@@ -31,36 +31,91 @@ const headers = {
     'User-Agent': 'FLAC-Lyrics-Finder (https://github.com/SjoerdHekking/FLAC-Lyrics-Finder)'
 };
 
+const MIN_INTERVAL_MS = 750;
+const MAX_RETRIES = 5;
+const JITTER_FRACTION = 0.3;
+
+let nextSlot = 0;
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function throttle() {
+    const now = Date.now();
+    const start = Math.max(now, nextSlot);
+    nextSlot = start + MIN_INTERVAL_MS;
+    const wait = start - now;
+    if (wait > 0) await sleep(wait);
+}
+
+function parseRetryAfter(value) {
+    if (value === undefined || value === null) return null;
+    const seconds = parseInt(value, 10);
+    if (Number.isFinite(seconds) && String(seconds) === String(value).trim()) {
+        return Math.max(0, seconds) * 1000;
+    }
+    const date = Date.parse(value);
+    if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+    return null;
+}
+
+async function lrclibGet(url) {
+    for (let attempt = 0; ; attempt++) {
+        await throttle();
+        try {
+            return await axios.get(url, { headers });
+        } catch (error) {
+            const status = error.response && error.response.status;
+            if (status === 429 && attempt < MAX_RETRIES) {
+                const retryAfterMs = parseRetryAfter(error.response.headers['retry-after']);
+                // Fall back to exponential backoff if the header is missing/unparseable.
+                const baseMs = retryAfterMs !== null && retryAfterMs > 0
+                    ? retryAfterMs
+                    : 5000 * Math.pow(2, attempt);
+                const delayMs = Math.round(baseMs + Math.random() * JITTER_FRACTION * baseMs);
+
+                nextSlot = Math.max(nextSlot, Date.now() + delayMs);
+
+                if (DEBUG) console.warn(colors.yellow(
+                    `Rate limited (429). Waiting ${(delayMs / 1000).toFixed(1)}s before retry ${attempt + 1}/${MAX_RETRIES}...`
+                ));
+                await sleep(delayMs);
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
 function getMetadata(filePath) {
     try {
         const fields = {
-        title: '',
-        artist: '',
-        album: ''
+            title: '',
+            artist: '',
+            album: ''
         };
 
         const ffprobeCommand = `ffprobe -v quiet -show_entries format_tags=artist,album,title -of default=noprint_wrappers=1:nokey=0 "${filePath}"`;
         const ffprobeOutput = execSync(ffprobeCommand, { encoding: 'utf8' });
 
         ffprobeOutput.split('\n').forEach(line => {
-        if (line.startsWith('TAG:')) {
-            const [key, ...valueParts] = line.slice(4).split('=');
-            const keyName = key.trim().toLowerCase();
-            const value = valueParts.join('=').trim();
-            if (fields.hasOwnProperty(keyName)) {
-            fields[keyName] = value;
+            if (line.startsWith('TAG:')) {
+                const [key, ...valueParts] = line.slice(4).split('=');
+                const keyName = key.trim().toLowerCase();
+                const value = valueParts.join('=').trim();
+                if (fields.hasOwnProperty(keyName)) {
+                    fields[keyName] = value;
+                }
             }
-        }
         });
 
         if (fields.title && fields.artist && fields.album) {
-        return fields;
+            return fields;
         } else {
-        if (DEBUG) {
-            console.warn(colors.yellow(`Incomplete metadata for file: ${filePath}`));
-            console.warn('Extracted fields:', fields);
-        }
-        return null;
+            if (DEBUG) {
+                console.warn(colors.yellow(`Incomplete metadata for file: ${filePath}`));
+                console.warn('Extracted fields:', fields);
+            }
+            return null;
         }
     } catch (error) {
         if (DEBUG) console.error(colors.red(`Failed to extract metadata for file: ${filePath}\n${error.message}`));
@@ -75,7 +130,7 @@ function uriEscape(str) {
 async function fetchLyrics(artist, title, album) {
     const apiUrl = `https://lrclib.net/api/get?artist_name=${uriEscape(artist)}&track_name=${uriEscape(title)}&album_name=${uriEscape(album)}`;
     try {
-        const response = await axios.get(apiUrl, { headers });
+        const response = await lrclibGet(apiUrl);
         return response.data;
     } catch (error) {
         if (DEBUG) console.error(colors.red(`Failed to fetch lyrics from /api/get: ${apiUrl}\n${error.message}`));
@@ -88,7 +143,7 @@ async function fetchFallbackLyrics(title, artist, album) {
     const apiUrlNoAlbum = `https://lrclib.net/api/search?track_name=${uriEscape(title)}&artist_name=${uriEscape(artist)}`;
 
     try {
-        const response = await axios.get(apiUrl, { headers });
+        const response = await lrclibGet(apiUrl);
         const results = response.data;
 
         if (Array.isArray(results) && results.length > 0) {
@@ -102,7 +157,7 @@ async function fetchFallbackLyrics(title, artist, album) {
     }
 
     try {
-        const responseNoAlbum = await axios.get(apiUrlNoAlbum, { headers });
+        const responseNoAlbum = await lrclibGet(apiUrlNoAlbum);
         const resultsNoAlbum = responseNoAlbum.data;
 
         if (Array.isArray(resultsNoAlbum) && resultsNoAlbum.length > 0) {
@@ -168,7 +223,7 @@ async function processFile(filePath) {
                     console.log(colors.yellow(`Lyrics not found for '${currentArtist} - ${title}'. Trying next artist...`));
                 }
             }
-        }        
+        }
 
         if (response && response.instrumental) {
             instrumental = true;
